@@ -1,0 +1,46 @@
+name: smoke
+
+# 只跑不联网的自测：造一本迷你 EPUB，跑 mock 翻译，校验产物结构。
+# 不需要 API Key，不调用任何外部服务。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 跑自测
+        env:
+          PYTHONPATH: ${{ github.workspace }}
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: python tests/smoke.py
+
+      - name: 上传自测报告
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-report-py${{ matrix.python-version }}
+          path: logs/smoke.txt
+          if-no-files-found: warn

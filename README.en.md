@@ -8,6 +8,16 @@ it is **a translated book you can actually read and print**.
 
 > 中文说明见 [README.md](README.md)。
 
+![Japanese edition in a reader](docs/preview-ja.png)
+
+<p align="center"><sub>
+Japanese edition in a reader: the TOC on the left is fully translated (page numbers still jump),<br>
+paragraphs map one-to-one and image positions are untouched.<br>
+Furigana is marked up with <code>&lt;ruby&gt;</code>; this particular reader has no ruby support, so it<br>
+falls back to <code>私（わたし）</code> — a ruby-capable reader puts the reading above the kanji.<br>
+Book content in the screenshot is © its author; shown only to illustrate layout and annotation.
+</sub></p>
+
 ---
 
 ## Why another EPUB translator?
@@ -222,7 +232,10 @@ No book needed, no network:
 
 It generates a two-chapter mini EPUB3 (nav TOC, poetry `<br>`, `<pre>` block, CSS-defined italics and
 small caps, footnote anchor, image), runs a mock translation, validates the output, re-runs to prove
-cache hits, and confirms PDFs are rejected. 33 assertions, report in `logs\smoke.txt`.
+cache hits, and confirms PDFs are rejected. 37 assertions, report in `logs\smoke.txt`.
+
+The same suite runs on GitHub Actions (`.github/workflows/smoke.yml`, Windows, Python 3.10/3.12) —
+no key, no network, so a PR cannot break things silently.
 
 ---
 
@@ -233,8 +246,13 @@ cache hits, and confirms PDFs are rejected. 33 assertions, report in `logs\smoke
   **publishing the translation is infringement** (Berne Convention and national laws).
 - This repo contains **no book text, no translations, no API keys**. `config.json`, `glossary.txt`,
   `cache/`, `out/` are gitignored.
+- `docs/preview-ja.png` is a screenshot for illustration; the book content in it is © its author.
 - The tool collects nothing. Your key stays in your local `config.json` and is only sent to the
   `base_url` you configure.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

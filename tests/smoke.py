@@ -189,6 +189,7 @@ def main():
     lines.append("")
     lines.append("（完整运行日志见 logs/smoke.txt）")
     text = "\n".join(lines)
+    os.makedirs(os.path.join(ROOT, "logs"), exist_ok=True)   # 全新 clone 里没有 logs/
     open(os.path.join(ROOT, "logs", "smoke.txt"), "w", encoding="utf-8").write(text)
     print(text)
     return 0 if ok else 1
