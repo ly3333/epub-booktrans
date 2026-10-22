@@ -141,10 +141,19 @@ coverage). `fill` then tops up unannotated kanji with MeCab + UniDic — determi
 (99.9%). `to_ruby()` splits `{引き裂く|ひきさく}` into `引(ひ)き裂(さ)く`, keeping okurigana outside
 the ruby, which is how Japanese typesetting normally does it.
 
+Markup looks like `<ruby>重要<rp>(</rp><rt>じゅうよう</rt><rp>)</rp></ruby>`. The `<rp>` pair is the
+HTML5 fallback for readers without ruby support: capable readers hide it and place the reading above
+the kanji, incapable ones show `重要（じゅうよう）` instead of the hard-to-read `重要じゅうよう`.
+
+> ⚠️ Never put `display:inline` on `ruby`. It disables ruby layout, `<rt>` degrades to a plain
+> inline run and the reading is concatenated after the kanji. Likewise do not add
+> `ruby>rp{display:none}` — that kills the fallback. Both were wrong before 0.1.1; two assertions in
+> `tests/smoke.py` now guard them.
+
 **5. Validation instead of "I checked it".**
 Every run reports XML validity, dead links, missing images and furigana coverage into the log.
-`tests/smoke.py` adds 33 assertions over a generated mini EPUB3 (nav TOC, poetry `<br>`, `<pre>`
-indentation, italics, footnote anchors, cache hits, PDF rejection).
+`tests/smoke.py` adds 37 assertions over a generated mini EPUB3 (nav TOC, poetry `<br>`, `<pre>`
+indentation, italics, footnote anchors, ruby markup structure, cache hits, PDF rejection).
 
 ---
 
@@ -195,7 +204,8 @@ repo; the method is reproducible):
 | `429` / rate limit | Lower `concurrency` to 3 |
 | A few paragraphs left in English | Those requests failed — re-run the same command |
 | Terminology drifts | Add the term to `glossary.txt`, delete `cache\cache.sqlite`, re-run (re-billed) |
-| Furigana renders on two lines | Reader lacks ruby support; Calibre / Apple Books / recent Kindle are fine |
+| Furigana sits inline right after the kanji (`重要じゅうよう`) | Two causes: ① before 0.1.1 the tool put `display:inline` on `ruby` — fixed, just re-run the same command (cache makes it free); ② your reader has no ruby support — it will now show `重要（じゅうよう）` instead. Use Calibre / Apple Books / Thorium / recent Kindle |
+| Furigana overlaps or is misaligned | Partial ruby support in the reader; try another one |
 | Layout looks off | Try `--keep-styles`; if it persists, map the class names in the `css` config block |
 
 Logs: `logs\run-*.log`.

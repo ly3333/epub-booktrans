@@ -32,6 +32,8 @@ ALLOWED = re.compile(
     r"</?(?:i|b|s|u|em|strong|del|strike|ins|code|tt|kbd|samp|var|cite|dfn"
     r"|sup|sub|small|br|a|span|ruby|rt|rb|rp)\b[^>]*>", re.I)
 KANA = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
+# 一个注音单元。rp 是给不支持 ruby 的阅读器看的降级括号。
+RUBY = "<ruby>%s<rp>(</rp><rt>%s</rt><rp>)</rp></ruby>"
 
 FALLBACK_CSS = """
 /* booktrans: 行内样式与振假名的兜底规则（原书缺哪条补哪条） */
@@ -41,11 +43,14 @@ FALLBACK_CSS = """
 .bt-u{text-decoration:underline}
 .bt-sc{font-variant:small-caps}
 .bt-tt{font-family:monospace}
-ruby{-webkit-ruby-align:center;ruby-align:center;display:inline}
+/* 注意：这里绝对不能给 ruby 写 display:inline。
+   那会把注音排版关掉，<rt> 变成普通行内文字，
+   假名直接接在汉字后面（"重要じゅうよう"）。2026-10-22 踩过。 */
+ruby{ruby-align:center;-webkit-ruby-align:center}
 rt{font-size:.5em;line-height:1.1;font-weight:normal;font-style:normal;
    letter-spacing:0;-webkit-ruby-position:over;ruby-position:over}
-ruby>rt,ruby>rt:first-child,ruby>rt:last-child{font-size:.5em}
-ruby>rp{display:none}
+/* <rp> 是给不支持 ruby 的阅读器看的括号，交给浏览器自己的 UA 样式去隐藏，
+   这里不要写 display:none，否则降级阅读器会退化成"重要じゅうよう"。 */
 """
 
 
@@ -238,7 +243,11 @@ def _prep(inner, style=None, keep_ws=False, keep_styles=True):
 
 
 def to_ruby(form, read):
-    """{表記|よみ} → 逐汉字 run 的 ruby，送り仮名留在 ruby 外。"""
+    """{表記|よみ} → 逐汉字 run 的 ruby，送り仮名留在 ruby 外。
+
+    输出带 <rp> 括号：支持 ruby 的阅读器会自动隐藏 rp，显示汉字上方的注音；
+    不支持的阅读器会显示成「重要（じゅうよう）」——比「重要じゅうよう」可读得多。
+    """
     read = re.sub(r"[^\u3040-\u309f\u30a0-\u30ffー]", "", read)
     out, i, j = [], 0, 0
     while i < len(form):
@@ -262,7 +271,7 @@ def to_ruby(form, read):
             rd, j = (read[j:m], m) if m != -1 else (read[j:], len(read))
         else:
             rd, j = read[j:], len(read)
-        out.append("<ruby>%s<rt>%s</rt></ruby>" % (kanji, rd) if rd else kanji)
+        out.append(RUBY % (kanji, rd) if rd else kanji)
         i = k
     out.append(form[i:])
     out.append(read[j:])

@@ -64,11 +64,14 @@ def check_dir(builddir, lang):
             elif frag and frag not in ids:
                 rep["dead_links"].append((os.path.basename(p), u))
         rep["ruby"] += raw.count("<ruby>")
+        # 注音部分（rt）和降级括号（rp）都不算正文
         txt = re.sub(r"<rt>.*?</rt>", "", raw, flags=re.S)
+        txt = re.sub(r"<rp>.*?</rp>", "", txt, flags=re.S)
         txt = re.sub(r"<[^>]+>", "", txt)
         rep["chars"] += len(re.sub(r"\s", "", txt))
         if lang == "ja":
-            plain = re.sub(r"<ruby>(.*?)<rt>.*?</rt></ruby>", "", raw, flags=re.S)
+            # 整块 ruby 去掉（里面有 rp/rt，不能按固定顺序匹配）
+            plain = re.sub(r"<ruby>.*?</ruby>", "", raw, flags=re.S)
             plain = re.sub(r"<[^>]+>", "", plain)
             rep["kanji_total"] += len(CJK.findall(txt))
             rep["kanji_bare"] += len(CJK.findall(plain))

@@ -24,6 +24,7 @@ ROOT = os.path.dirname(HERE)
 sys.path.insert(0, ROOT)
 
 from booktrans import cli, validate  # noqa: E402
+from booktrans import epub as E  # noqa: E402
 import make_fixture  # noqa: E402
 
 OUT = os.path.join(ROOT, "out", "_smoke")
@@ -133,6 +134,23 @@ def main():
         css = next((v for k, v in files.items() if k.endswith(".css")), "")
         check("[4-%s] ruby / bt-* 兜底 CSS 已注入" % lang,
               "bt-i" in css and "ruby" in css, "")
+        # 2026-10-22 的回归：给 ruby 写 display:inline 会把注音排版整个关掉，
+        # <rt> 退化成普通行内文字，假名直接接在汉字后面（重要じゅうよう）。
+        flat = css.replace(" ", "").replace("\n", "")
+        check("[4-%s] 兜底 CSS 不得破坏 ruby 布局" % lang,
+              "ruby{display:inline" not in flat and "ruby{display:inline}" not in flat,
+              "命中 display:inline 的 ruby 规则" if "ruby{display:inline" in flat else "OK")
+
+    # [8] 注音单元本身：必须是 ruby + rt，并且带 rp 降级括号
+    r = E.to_ruby("重要", "じゅうよう")
+    check("[8] to_ruby 产出 ruby/rt/rp",
+          "<rt>じゅうよう</rt>" in r and "<rp>" in r and r.startswith("<ruby>"), r)
+    r2 = E.to_ruby("引き裂く", "ひきさく")
+    check("[8] 送り仮名留在 ruby 外",
+          r2.count("<ruby>") == 2 and "く" in r2.split("</ruby>")[-1], r2)
+    check("[8] 兜底 CSS 不含 display:inline",
+          "display:inline" not in re.sub(r"/\*.*?\*/", "", E.FALLBACK_CSS, flags=re.S).replace(" ", ""),
+          "")
 
     rc, out = run(["make", FIX, "--provider", "mock", "--lang", "zh,ja",
                    "--out", OUT, "--concurrency", "4"])
