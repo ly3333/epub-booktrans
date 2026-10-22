@@ -1,0 +1,33 @@
+{
+  "_说明": "把本文件复制成 config.json 再改。config.json 已被 .gitignore 排除，不会提交。",
+  "_说明2": "provider 支持 openai（任何 OpenAI 兼容接口）与 mock（不联网，自测用）。",
+
+  "provider": "openai",
+  "base_url": "https://api.deepseek.com/v1",
+  "api_key": "在这里填你的 API Key",
+  "model": "deepseek-chat",
+
+  "temperature": 0.6,
+  "max_tokens": 8192,
+  "timeout": 180,
+  "retries": 3,
+  "concurrency": 6,
+  "words_per_chunk": 1200,
+
+  "glossary": "glossary.txt",
+  "style_notes": "",
+  "keep_inline_styles": false,
+
+  "price_in_per_mtok": 0.0,
+  "price_out_per_mtok": 0.0,
+
+  "_help": {
+    "base_url": "本地模型示例：http://127.0.0.1:11434/v1 （Ollama），api_key 随便填个 ollama",
+    "concurrency": "并发请求数，默认 6；撞 429 就降到 3",
+    "words_per_chunk": "每次请求翻多少英文词，太大容易输出截断",
+    "style_notes": "追加给模型的文风要求，例如：多用短句，少用四字成语",
+    "keep_inline_styles": "true = 连原书行内配色/字号 class 一起保留（文本会长约 5%）",
+    "price_in_per_mtok": "每百万 token 的输入单价，填了 --dry-run 才会估钱；不填就是 0",
+    "price_out_per_mtok": "每百万 token 的输出单价"
+  }
+}

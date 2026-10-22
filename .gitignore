@@ -1,0 +1,25 @@
+# ---- 你本机的东西，绝不提交 ----
+config.json
+glossary.txt
+
+# 运行产物
+out/
+cache/
+logs/
+*.epub
+!tests/*.epub
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# 编辑器 / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -1,0 +1,11 @@
+# 依赖（核心）
+beautifulsoup4>=4.12
+lxml>=5.0
+
+# 说明：代码只用标准库 urllib 发请求，没有装 requests 也能跑。
+# requests 留着是为了你自己调试接口时方便。
+requests>=2.31
+
+# 可选：日文假名补标（--furigana fill 才需要，约 47MB 词典）
+# 需要时手动装：
+#   .venv\Scripts\pip install fugashi unidic-lite
