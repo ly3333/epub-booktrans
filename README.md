@@ -107,6 +107,7 @@ booktrans.cmd make "D:\books\some book.epub" --dry-run
 | `booktrans.cmd make 书.epub --title-zh "书名"` | 手动指定书名（默认自动译） |
 | `booktrans.cmd make 书.epub --furigana fill` | 日文版用 MeCab 补标漏掉的假名 |
 | `booktrans.cmd make 书.epub --keep-styles` | 连原书行内配色/字号 class 也保留 |
+| `booktrans.cmd make 书.epub --ruby-mode span` | 注音改用兼容排版（给不支持 `<ruby>` 的阅读器） |
 | `booktrans.cmd validate 成品.epub --lang ja` | 单独校验任意 epub |
 | `booktrans.cmd --version` | 版本 |
 
@@ -127,6 +128,7 @@ booktrans.cmd make "D:\books\some book.epub" --dry-run
 | `glossary` | `glossary.txt` | 术语表文件名 |
 | `style_notes` | 空 | 追加给模型的文风要求，如「多用短句，少用四字成语」 |
 | `keep_inline_styles` | false | 是否保留原书行内配色/字号 class |
+| `ruby_mode` | `std` | `std`=标准 `<ruby>`；`span`=兼容排版，不依赖 ruby 支持 |
 | `price_in_per_mtok` / `price_out_per_mtok` | 0 | 单价（每百万 token），填了 `--dry-run` 才估钱 |
 
 ## 术语表
@@ -194,6 +196,20 @@ EPUB3 用 `nav.xhtml`，EPUB2 用 `toc.ncx`，很多书两套都有。做法是�
 `to_ruby()` 负责把 `{引き裂く|ひきさく}` 拆成 `引(ひ)き裂(さ)く` 这种形式——送り仮名留在 `<ruby>` 外面，这是日文排版的标准做法，也是"整词一坨"看起来别扭的原因。
 
 输出形如 `<ruby>重要<rp>(</rp><rt>じゅうよう</rt><rp>)</rp></ruby>`，`<rp>` 是给**不支持 ruby 的阅读器**看的降级括号：支持 ruby 的阅读器会自动隐藏它、把假名排到汉字上方；不支持的会显示成 `重要（じゅうよう）`，而不是难读的 `重要じゅうよう`。
+
+**如果阅读器连 `<ruby>` 都不认**（假名总是以 `（かんが）` 的形式跟在汉字后面），加 `--ruby-mode span` 重出。这时改用 `inline-block` 上下堆叠，完全不依赖 ruby 支持：
+
+```html
+<span class="bt-rb"><span class="bt-rt">じゅうよう</span><span class="bt-rb-b">重要</span></span>
+```
+
+```css
+.bt-rb{display:inline-block;text-align:center;line-height:1.15}
+.bt-rt{display:block;font-size:.5em}   /* 上行：假名 */
+.bt-rb-b{display:block}                /* 下行：汉字 */
+```
+
+代价是假名变成正文的一部分（搜索、复制会带上读音），所以默认不做。
 
 > ⚠️ 一个踩过的坑：**绝对不要给 `ruby` 写 `display:inline`**。那会关掉 ruby 的注音布局，`<rt>` 退化成普通行内文字，假名直接接在汉字后面。同理也别写 `ruby>rp{display:none}`——那会让降级阅读器丢掉括号。0.1.1 之前有这个问题，`tests/smoke.py` 现在有两条断言专门守它。
 
@@ -268,7 +284,9 @@ PDF 是**版面坐标**，不是结构：没有段落、没有标题层级、没
 | `429` / rate limit | 把 `concurrency` 降到 3，或换 key |
 | 某几段没译（成品里是英文） | 那几段请求失败了，重跑同一条命令即可补齐 |
 | 跑完发现术语前后不一致 | 往 `glossary.txt` 里加该词，删 `cache\cache.sqlite` 重跑（会重新计费） |
-| 假名和汉字挤在同一行（`重要じゅうよう`） | 两种原因：① 0.1.1 之前工具给 `ruby` 写了 `display:inline`，已修，重跑同一条命令即可（走缓存，0 费用）；② 阅读器不支持 ruby —— 现在会显示成 `重要（じゅうよう）`，可读但不美观，换 Calibre / Apple Books / Thorium / 多看 / 新版 Kindle |
+| 假名和汉字挤在同一行（`重要じゅうよう`） | ① 0.1.1 之前工具给 `ruby` 写了 `display:inline`，已修；② 阅读器不支持 ruby，加 `--ruby-mode span` 重出（走缓存，0 费用），假名会排在汉字正上方 |
+| 假名显示成 `（じゅうよう）` 跟在汉字后面 | 阅读器不支持 ruby。换 Calibre / Apple Books / Thorium / 多看，或用 `--ruby-mode span` |
+| 目录条目显示成 `<a href=...>` 源码 | 0.1.1 之前复用正文译文时把整段 HTML 塞进了 ncx，已在 0.1.2 修 |
 | 假名和汉字叠在一起、错位 | 阅读器对 ruby 支持不完整，换一个 |
 | 目录还是英文 | 这本书两套导航都没有，或目录写在正文里 |
 | 排版乱了 | 这本书的 class 体系很特殊。先用 `--keep-styles` 试试，再不行把 `css` 段落里的类名改成你的书里的 |

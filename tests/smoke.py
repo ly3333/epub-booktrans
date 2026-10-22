@@ -108,6 +108,9 @@ def main():
             changed = [x for x in labs if x.startswith("【%s】" % lang)]
             check("[3-%s] EPUB2 ncx 目录已翻译" % lang, len(changed) >= 2,
                   "%d/%d 条：%s" % (len(changed), len(labs), labs[:2]))
+            # 目录标签里出现标签源码 = 复用了整段 HTML 的译文，属于回归
+            dirty = [x for x in labs if "&lt;" in x or "&gt;" in x or "{" in x]
+            check("[3-%s] ncx 标签是纯文本" % lang, not dirty, str(dirty[:2]))
 
         c1 = next((v for k, v in files.items() if k.endswith("ch1.xhtml")), "")
         c2 = next((v for k, v in files.items() if k.endswith("ch2.xhtml")), "")
@@ -149,8 +152,24 @@ def main():
     check("[8] 送り仮名留在 ruby 外",
           r2.count("<ruby>") == 2 and "く" in r2.split("</ruby>")[-1], r2)
     check("[8] 兜底 CSS 不含 display:inline",
-          "display:inline" not in re.sub(r"/\*.*?\*/", "", E.FALLBACK_CSS, flags=re.S).replace(" ", ""),
+          not re.search(r"display\s*:\s*inline\s*[;}]",
+                        re.sub(r"/\*.*?\*/", "", E.FALLBACK_CSS, flags=re.S)),
           "")
+
+    # [9] 目录标签只能是纯文本：复用正文译文时拿到的是整段 HTML，必须压平
+    check("[9] 目录标签压成纯文本",
+          E.plain_label('<a href="x.html#a">Dedication</a>') == "Dedication"
+          and E.plain_label("会話{かいわ}が") == "会話が"
+          and E.plain_label('<ruby>会話<rp>(</rp><rt>かいわ</rt><rp>)</rp></ruby>') == "会話",
+          E.plain_label('<a href="x.html#a">Dedication</a>'))
+
+    # [10] 兼容模式：不依赖 ruby，注音块在汉字块之前（视觉上在上方）
+    E.set_ruby_mode("span")
+    r3 = E.to_ruby("重要", "じゅうよう")
+    check("[10] span 模式注音在汉字上方",
+          "bt-rb" in r3 and r3.find("bt-rt") < r3.find("bt-rb-b") and "じゅうよう" in r3, r3)
+    E.set_ruby_mode("std")
+    check("[10] 回到 std 模式", "<ruby>" in E.to_ruby("重要", "じゅうよう"), "")
 
     rc, out = run(["make", FIX, "--provider", "mock", "--lang", "zh,ja",
                    "--out", OUT, "--concurrency", "4"])

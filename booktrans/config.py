@@ -37,6 +37,11 @@ DEFAULTS = {
     # 少数模型会把嵌套标签搞乱），要么丢掉（丢这部分观感）。
     # 默认丢：与已验证过的产出保持一致。想尽量还原原书观感就设 true。
     "keep_inline_styles": False,
+    # 注音排版方式：
+    #   std  = 标准 <ruby>，假名排在汉字上方（Calibre / Apple Books / Thorium / 多看 都支持）
+    #   span = 兼容模式，不依赖 ruby 支持，用 inline-block 上下堆叠
+    #          给不支持 <ruby> 的阅读器用（不然假名会作为普通文字接在汉字后面）
+    "ruby_mode": "std",
 }
 
 

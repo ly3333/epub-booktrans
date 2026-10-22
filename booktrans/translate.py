@@ -312,8 +312,10 @@ def translate_labels(labels, lang, cfg, log=print, seen=None):
         items = [{"uid": "T%03d" % i, "en": s, "file": "toc"} for i, s in enumerate(todo)]
         try:
             got = prov.translate(items, lang, cfg)
+            from .epub import plain_label          # 延迟导入，避免循环依赖
             for it in items:
-                out[it["en"]] = (got.get(it["uid"]) or "").strip() or it["en"]
+                raw = (got.get(it["uid"]) or "").strip()
+                out[it["en"]] = plain_label(raw) or it["en"]   # 目录标签只能是纯文本
         except Exception as e:
             log("  ! 目录标题翻译失败，保留原文：%s" % str(e)[:80])
             for s in todo:

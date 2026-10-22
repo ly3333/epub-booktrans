@@ -34,6 +34,17 @@ ALLOWED = re.compile(
 KANA = re.compile(r"[\u3040-\u309f\u30a0-\u30ff]")
 # 一个注音单元。rp 是给不支持 ruby 的阅读器看的降级括号。
 RUBY = "<ruby>%s<rp>(</rp><rt>%s</rt><rp>)</rp></ruby>"
+# 兼容模式：完全不依赖 <ruby> 支持，用 inline-block 上下堆叠模拟注音。
+# 布局不支持 ruby 的阅读器（不少国产阅读器就是）只能靠这个。
+RUBY_SPAN = ('<span class="bt-rb"><span class="bt-rt">%s</span>'
+             '<span class="bt-rb-b">%s</span></span>')
+RUBY_MODE = "std"          # std | span，由 cli 按 --ruby-mode 或 config 设置
+
+
+def set_ruby_mode(mode):
+    global RUBY_MODE
+    RUBY_MODE = "span" if str(mode).lower() in ("span", "compat", "fallback") else "std"
+    return RUBY_MODE
 
 FALLBACK_CSS = """
 /* booktrans: 行内样式与振假名的兜底规则（原书缺哪条补哪条） */
@@ -51,6 +62,11 @@ rt{font-size:.5em;line-height:1.1;font-weight:normal;font-style:normal;
    letter-spacing:0;-webkit-ruby-position:over;ruby-position:over}
 /* <rp> 是给不支持 ruby 的阅读器看的括号，交给浏览器自己的 UA 样式去隐藏，
    这里不要写 display:none，否则降级阅读器会退化成"重要じゅうよう"。 */
+/* 兼容模式（--ruby-mode span）：不依赖 ruby 支持，注音叠在汉字正上方 */
+.bt-rb{display:inline-block;text-align:center;vertical-align:baseline;line-height:1.15;
+   margin:0 .02em}
+.bt-rt{display:block;font-size:.5em;line-height:1.2;white-space:nowrap}
+.bt-rb-b{display:block;line-height:1.15}
 """
 
 
@@ -271,7 +287,8 @@ def to_ruby(form, read):
             rd, j = (read[j:m], m) if m != -1 else (read[j:], len(read))
         else:
             rd, j = read[j:], len(read)
-        out.append(RUBY % (kanji, rd) if rd else kanji)
+        out.append((RUBY_SPAN % (rd, kanji) if RUBY_MODE == "span" else RUBY % (kanji, rd))
+                   if rd else kanji)
         i = k
     out.append(form[i:])
     out.append(read[j:])
@@ -316,6 +333,9 @@ def render_text(s, lang, cfg):
         s = re.sub(r"\{([^{}|]+)\|([^{}|]+)\}", lambda m: keep(to_ruby(m.group(1), m.group(2))), s)
         s = re.sub(r"([\u4e00-\u9fff]+)\{([\u3040-\u309f\u30a0-\u30ff]+)\}",
                    lambda m: keep(to_ruby(m.group(1), m.group(2))), s)
+        # 片假名后面跟注音的情况（レーベル{れーべる}）：片假名本来不需要注音，
+        # 留着标记只会退化成"レーベルれーべる"，直接丢掉标记。
+        s = re.sub(r"\{[\u3040-\u309f\u30a0-\u30ffー]+\}", "", s)
         s = s.replace("{", "").replace("}", "")
     s = ALLOWED.sub(keep_tag, s)
     # 原书里的实体（&nbsp; &amp; &lt; &#8212;）必须原样带走，不能被二次转义成 &amp;nbsp;
@@ -397,7 +417,8 @@ def patch_ncx(text, lang, title, tmap):
 
     def sub(m):
         src = html.unescape(m.group(2)).strip()
-        return m.group(1) + html.escape(tmap.get(src, src)) + m.group(3)
+        val = plain_label(tmap.get(src, src)) or src     # 兜底：目录里绝不出现标签
+        return m.group(1) + html.escape(val) + m.group(3)
 
     return NCX_LABEL.sub(sub, text)
 
@@ -455,6 +476,28 @@ def _nav_spans(raw, navspan):
     return out
 
 
+def plain_label(s):
+    """把译文压成纯文本，专给目录标签用。
+
+    目录标签（ncx 的 <text>、nav 里 <a> 的文字）只能是纯文本。
+    但"复用正文译文"拿到的可能是一整段 HTML（正文里的目录页就是
+    `<a href="...">Dedication</a>` 这种），直接写进去会被转义成源码，
+    读者面板里显示成 &lt;a href=...&gt;。2026-10-22 踩过。
+
+    这里依次去掉：注音标记 {表記|よみ}、<rt>/<rp>、其余标签，再反转义。
+    """
+    if not s:
+        return ""
+    s = re.sub(r"<rt\b[^>]*>.*?</rt\s*>", "", s, flags=re.S | re.I)
+    s = re.sub(r"<rp\b[^>]*>.*?</rp\s*>", "", s, flags=re.S | re.I)
+    s = re.sub(r"\{([^{}|]*)\|[^{}|]*\}", r"\1", s)      # {献辞|けんじ} → 献辞
+    s = re.sub(r"\{[\u3040-\u309f\u30a0-\u30ffー]+\}", "", s)   # 会話{かいわ} → 会話
+    s = s.replace("{", "").replace("}", "")
+    s = re.sub(r"<[^>]+>", "", s)
+    s = html.unescape(s)
+    return re.sub(r"\s+", " ", s).strip()
+
+
 def collect_toc(book):
     """读出书里所有导航文件的目录条目，去重后返回待译清单。"""
     plan = {"ncx": None, "nav": None, "labels": []}
@@ -499,7 +542,7 @@ def patch_nav(raw, spans, tmap):
     for sp in sorted(spans, key=lambda x: x["start"]):
         if sp["start"] < last or not sp["text"]:
             continue
-        new = tmap.get(sp["text"], sp["text"])
+        new = plain_label(tmap.get(sp["text"], sp["text"])) or sp["text"]
         out.append(raw[last:sp["start"]])
         out.append(html.escape(new))
         last = sp["end"]

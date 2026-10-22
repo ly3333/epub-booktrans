@@ -120,6 +120,9 @@ def cmd_make(args):
         cfg["replay_dir"] = args.replay_dir
     if getattr(args, "keep_styles", False):
         cfg["keep_inline_styles"] = True
+    if getattr(args, "ruby_mode", None):
+        cfg["ruby_mode"] = args.ruby_mode
+    E.set_ruby_mode(cfg.get("ruby_mode", "std"))
     langs = [x.strip() for x in (args.lang or "zh,ja").split(",") if x.strip()]
     if args.book.lower().endswith(".pdf"):
         print("这个工具只吃 EPUB。PDF 是版面坐标、没有段落和锚点，转出来会丢行内强调和脚注跳转。")
@@ -208,10 +211,14 @@ def cmd_make(args):
                 v = tr.get(u["file"], {}).get(u["uid"])
                 if not v:
                     continue
-                seen.setdefault(u["en"].strip(), v)
+                pv = E.plain_label(v)
+                seen.setdefault(u["en"].strip(), pv)
                 plain = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", "", u["en"])).strip()
                 if plain:
-                    seen.setdefault(plain, v)
+                    # 键是纯文本，值也必须是纯文本——正文里的目录页整段就是
+                    # `<a href="...">Dedication</a>`，它的译文带着 <a> 和注音标记，
+                    # 直接塞进 ncx 的 <text> 会被转义成源码。
+                    seen.setdefault(plain, pv)
             labels = plan["labels"]
             lm = T.translate_labels(labels, lang, cfg, log=log, seen=seen) if labels else {}
             if lang in ("zh", "ja") and not getattr(args, "title_" + lang, None):
@@ -300,6 +307,8 @@ def build_parser():
     m.add_argument("--glossary")
     m.add_argument("--keep-styles", action="store_true",
                    help="连原书的行内配色/字号 class 也保留（默认只保留斜体粗体等语义样式）")
+    m.add_argument("--ruby-mode", choices=["std", "span"],
+                   help="注音排版：std=标准 <ruby>（默认）；span=兼容模式，给不支持 ruby 的阅读器")
     m.add_argument("--config")
     m.add_argument("--replay-dir", help=argparse.SUPPRESS)
     m.add_argument("--dry-run", action="store_true", help="只统计不翻译")
